@@ -21,19 +21,19 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building Docker images...'
-                bat 'docker compose build'
+                sh 'docker compose build'
             }
         }
 
         stage('Deploy') {
             steps {
                 echo 'Stopping any existing containers...'
-                bat 'docker compose down'
+                sh 'docker compose down'
+
                 echo 'Starting containers...'
-                bat 'docker compose up -d'
+                sh 'docker compose up -d'
             }
         }
-
     }
 
     post {
@@ -41,8 +41,8 @@ pipeline {
             echo 'Pipeline succeeded! App is running.'
         }
         failure {
-            echo 'Pipeline failed. Check the logs above.'
-            bat 'docker compose down'
+            echo 'Pipeline failed. Check logs above.'
+            sh 'docker compose down'
         }
     }
 }
