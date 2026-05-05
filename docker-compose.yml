@@ -1,37 +1,55 @@
-services:
+pipeline {
+    agent any
 
-  mongo:
-    image: mongo
-    # No ports exposed to host — backend reaches it via internal network
+    triggers {
+        githubPush()
+    }
 
-  backend:
-    build: ./backend
-    ports:
-      - "5005:5000"
-    environment:
-      - MONGO_URI=mongodb://mongo:27017/demoDB
-    depends_on:
-      - mongo
+    environment {
+        COMPOSE_FILE = 'docker-compose.yml'
+    }
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
+    stages {
 
-  # jenkins:
-  #   image: jenkins/jenkins:lts
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8080:8080"
-  #     - "50000:50000"
-  #   volumes:
-  #     - jenkins_home:/var/jenkins_home
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #   environment:
-  #     - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-  #   user: root
+        stage('Checkout') {
+            steps {
+                echo 'Pulling latest code from GitHub...'
+                git branch: 'main',
+                    url: 'https://github.com/Yash-635/Assignment-27.git'
+            }
+        }
 
-volumes:
-  jenkins_home:
+        stage('Cleanup') {
+            steps {
+                echo 'Removing all stopped containers...'
+                sh 'docker compose -f $COMPOSE_FILE down || true'
+                sh 'docker container prune -f'
+            }
+        }
+
+        stage('Build & Deploy') {
+            steps {
+                echo 'Building and starting containers...'
+                sh 'docker compose -f $COMPOSE_FILE up -d --build'
+            }
+        }
+
+        stage('Verify') {
+            steps {
+                echo 'Verifying containers are running...'
+                sleep(time: 5, unit: 'SECONDS')
+                sh 'docker compose -f $COMPOSE_FILE ps'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline succeeded! App is running.'
+        }
+        failure {
+            echo 'Pipeline failed. Rolling back...'
+            sh 'docker compose -f $COMPOSE_FILE down || true'
+        }
+    }
+}
