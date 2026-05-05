@@ -1,55 +1,35 @@
-pipeline {
-    agent any
+version: '3.8'
 
-    triggers {
-        githubPush()
-    }
+services:
 
-    environment {
-        COMPOSE_FILE = 'docker-compose.yml'
-    }
+  mongodb:
+    image: mongo:6
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
 
-    stages {
+  backend:
+    build: ./backend
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/demoDB
+    depends_on:
+      - mongodb
 
-        stage('Checkout') {
-            steps {
-                echo 'Pulling latest code from GitHub...'
-                git branch: 'main',
-                    url: 'https://github.com/Yash-635/Assignment-27.git'
-            }
-        }
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
 
-        stage('Cleanup') {
-            steps {
-                echo 'Removing all stopped containers...'
-                sh 'docker compose -f $COMPOSE_FILE down || true'
-                sh 'docker container prune -f'
-            }
-        }
-
-        stage('Build & Deploy') {
-            steps {
-                echo 'Building and starting containers...'
-                sh 'docker compose -f $COMPOSE_FILE up -d --build'
-            }
-        }
-
-        stage('Verify') {
-            steps {
-                echo 'Verifying containers are running...'
-                sleep(time: 5, unit: 'SECONDS')
-                sh 'docker compose -f $COMPOSE_FILE ps'
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Pipeline succeeded! App is running.'
-        }
-        failure {
-            echo 'Pipeline failed. Rolling back...'
-            sh 'docker compose -f $COMPOSE_FILE down || true'
-        }
-    }
-}
+volumes:
+  mongo_data:
