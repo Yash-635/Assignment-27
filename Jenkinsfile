@@ -18,20 +18,21 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Build & Deploy') {
             steps {
-                echo 'Building Docker images...'
-                sh 'docker compose build'
+                echo 'Stopping existing containers...'
+                sh 'docker compose -f $COMPOSE_FILE down || true'
+
+                echo 'Building and starting containers...'
+                sh 'docker compose -f $COMPOSE_FILE up -d --build'
             }
         }
 
-        stage('Deploy') {
+        stage('Verify') {
             steps {
-                echo 'Stopping any existing containers...'
-                sh 'docker compose down'
-
-                echo 'Starting containers...'
-                sh 'docker compose up -d'
+                echo 'Verifying containers are running...'
+                sleep(time: 5, unit: 'SECONDS')
+                sh 'docker compose -f $COMPOSE_FILE ps'
             }
         }
     }
@@ -41,8 +42,8 @@ pipeline {
             echo 'Pipeline succeeded! App is running.'
         }
         failure {
-            echo 'Pipeline failed. Check logs above.'
-            sh 'docker compose down'
+            echo 'Pipeline failed. Rolling back...'
+            sh 'docker compose -f $COMPOSE_FILE down || true'
         }
     }
 }
